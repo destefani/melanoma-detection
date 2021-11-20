@@ -7,15 +7,16 @@ from sklearn.model_selection import train_test_split
 class MelanomaDataset(Dataset):
     "SIIM-ISIC Melanoma Dataset"
 
-    def __init__(self,
-                 csv_file,
-                 root_dir,
-                 format=".jpg",
-                 transform=None,
-                 test=False,
-                 test_size=0.2,
-                 seed=42
-            ):
+    def __init__(
+        self,
+        csv_file,
+        root_dir,
+        format=".jpg",
+        transform=None,
+        test=False,
+        test_size=0.2,
+        seed=42,
+    ):
 
         self.annotations = pd.read_csv(csv_file)
         self.root_dir = root_dir
@@ -26,8 +27,11 @@ class MelanomaDataset(Dataset):
         self.seed = seed
 
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            self.annotations["image_name"], self.annotations["target"],
-            test_size=self.test_size, random_state=self.seed, stratify=self.annotations["target"]
+            self.annotations["image_name"],
+            self.annotations["target"],
+            test_size=self.test_size,
+            random_state=self.seed,
+            stratify=self.annotations["target"],
         )
 
         if test:
@@ -39,7 +43,7 @@ class MelanomaDataset(Dataset):
 
     def __len__(self):
         return len(self.annotations)
-    
+
     def __getitem__(self, idx):
         filename = self.annotations.iloc[idx]
         file_directory = self.root_dir + filename + self.format
@@ -50,4 +54,3 @@ class MelanomaDataset(Dataset):
             image = self.transform(image)
 
         return image, label
-
