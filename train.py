@@ -172,9 +172,9 @@ for epoch in range(wandb.config.epochs):
             "val_loss": running_loss,
             "val_acc": acc
         })
-        print(f"Eval - Epoch: {epoch}, Loss: {running_loss: .2f}, Accuracy: {acc: .4f}")
+        print(f"Eval  - Epoch: {epoch}, Loss: {running_loss: .2f}, Accuracy: {acc: .4f}")
 
 
     # Save model checpoint
-    if epoch % 10 == 0:
+    if (epoch + 1) % 10 == 0:
         torch.save(model, f"results/{wandb.run.name}/{epoch:04d}.pt")
