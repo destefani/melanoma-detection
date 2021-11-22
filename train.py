@@ -18,9 +18,9 @@ os.mkdir(f"results/{wandb.run.name}")
 
 
 wandb.config.update({
-    "epochs": 30,
+    "epochs": 51,
     "batch_size": 32,
-    "n_workers": 8,
+    "n_workers": 12,
     "learning_rate": 1e-3,
     "lambda_l2": 1e-5
 })
@@ -71,7 +71,7 @@ def get_sampler(labels_df):
     unique_labels, count = np.unique(labels_df, return_counts=True)
     label_weight = [sum(count) / c for c in count]
     weights = [label_weight[e] for e in labels_df]
-    return WeightedRandomSampler(weights, len(weights), replacement=True)
+    return WeightedRandomSampler(weights, len(weights))
 
 sampler = get_sampler(train_dataset.y_train)
 
@@ -142,16 +142,18 @@ for epoch in range(wandb.config.epochs):
 
 
     acc = correct_preds / (correct_preds + wrong_preds)
-    wandb.log({
-        "train_loss": running_loss,
-        "train_acc": acc
-    })
     print(f"Train - Epoch: {epoch}, Loss: {running_loss: .2f}, Accuracy: {acc: .4f}")
 
     # Validation
     running_loss = 0.0
     correct_preds = 0.0
+    
     wrong_preds = 0.0
+    true_negative = 0.0
+    false_positive = 0.0
+    false_negatives = 0.0
+    true_positive = 0.0
+
 
     with torch.no_grad():
         for i, (images, labels) in enumerate(val_loader):
@@ -162,19 +164,38 @@ for epoch in range(wandb.config.epochs):
             y_pred = model(images)
             y_pred = torch.sigmoid(y_pred).view(-1)
             loss = criterion(y_pred, labels)
+            try:
+                tn, fp, fn, tp = confusion_matrix(
+                    labels.cpu().numpy(), torch.round(y_pred).cpu().numpy()
+                    ).ravel()
+                true_negative += tn
+                false_positive += fp
+                false_negatives += fn
+                true_positive += tp
+            except:
+                pass
 
             running_loss += loss.item()
             correct_preds += (labels == torch.round(y_pred)).sum()
             wrong_preds += (labels != torch.round(y_pred)).sum()
 
         acc = correct_preds / (correct_preds + wrong_preds)
+        precision = true_positive / (true_positive + false_positive)
+        recall = true_positive / (true_positive + false_negatives)
+        f1 = 2 * precision * recall / (precision + recall)
         wandb.log({
+            "epoch": epoch,
+            "train_loss": running_loss,
+            "train_acc": acc,
             "val_loss": running_loss,
-            "val_acc": acc
+            "val_acc": acc,
+            "val_precision": precision,
+            "val_recall": recall,
+            "val_f1": f1
         })
         print(f"Eval  - Epoch: {epoch}, Loss: {running_loss: .2f}, Accuracy: {acc: .4f}")
 
 
     # Save model checpoint
-    if (epoch + 1) % 10 == 0:
+    if (epoch) % 10 == 0:
         torch.save(model, f"results/{wandb.run.name}/{epoch:04d}.pt")
