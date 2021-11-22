@@ -8,6 +8,7 @@ from sklearn.metrics import confusion_matrix
 import pandas as pd
 import numpy as np
 import wandb
+
 wandb.init(project="melanoma-detection", entity="mdestefani")
 
 
@@ -17,36 +18,40 @@ annotations_csv = "dataset/siim-isic-melanoma-classification/train.csv"
 os.mkdir(f"results/{wandb.run.name}")
 
 
-wandb.config.update({
-    "epochs": 51,
-    "batch_size": 32,
-    "n_workers": 12,
-    "learning_rate": 1e-3,
-    "lambda_l2": 1e-5
-})
+wandb.config.update(
+    {
+        "epochs": 51,
+        "batch_size": 32,
+        "n_workers": 12,
+        "learning_rate": 1e-3,
+        "lambda_l2": 1e-5,
+    }
+)
 
 # Transforms
 
-train_transforms = transforms.Compose([
+train_transforms = transforms.Compose(
+    [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.8310, 0.6339, 0.5969], std=[0.1537, 0.1970, 0.2245]
+        ),
+    ]
+)
 
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomVerticalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.8310, 0.6339, 0.5969],
-        std=[0.1537, 0.1970, 0.2245]
-    )
-])
-
-val_transforms = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.Normalize(
-        mean=[0.8310, 0.6339, 0.5969],
-        std=[0.1537, 0.1970, 0.2245])
-])
+val_transforms = transforms.Compose(
+    [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.Normalize(
+            mean=[0.8310, 0.6339, 0.5969], std=[0.1537, 0.1970, 0.2245]
+        ),
+    ]
+)
 
 # Create datasets
 
@@ -56,7 +61,8 @@ train_dataset = MelanomaDataset(
     transform=train_transforms,
     test=False,
     test_size=0.2,
-    seed=42)
+    seed=42,
+)
 
 test_dataset = MelanomaDataset(
     annotations_csv,
@@ -64,7 +70,8 @@ test_dataset = MelanomaDataset(
     transform=train_transforms,
     test=True,
     test_size=0.2,
-    seed=42)
+    seed=42,
+)
 
 
 def get_sampler(labels_df):
@@ -73,6 +80,7 @@ def get_sampler(labels_df):
     weights = [label_weight[e] for e in labels_df]
     return WeightedRandomSampler(weights, len(weights))
 
+
 sampler = get_sampler(train_dataset.y_train)
 
 train_loader = DataLoader(
@@ -80,16 +88,16 @@ train_loader = DataLoader(
     wandb.config.batch_size,
     num_workers=wandb.config.n_workers,
     sampler=sampler,
-    pin_memory=True
-    )
+    pin_memory=True,
+)
 
 val_loader = DataLoader(
     test_dataset,
     wandb.config.batch_size,
     num_workers=wandb.config.n_workers,
     shuffle=True,
-    pin_memory=True
-    )
+    pin_memory=True,
+)
 
 device = "cuda" if torch.cuda.is_available else "cpu"
 
@@ -104,15 +112,15 @@ criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(
     model.parameters(),
     lr=wandb.config.learning_rate,
-    weight_decay=wandb.config.lambda_l2
+    weight_decay=wandb.config.lambda_l2,
 )
 
 for epoch in range(wandb.config.epochs):
     wandb.watch(model)
     # Training
-    running_loss = 0.0
-    correct_preds = 0.0
-    wrong_preds = 0.0
+    train_loss = 0.0
+    train_correct_preds = 0.0
+    train_wrong_preds = 0.0
 
     for i, (images, labels) in enumerate(train_loader):
         images = images.to(device)
@@ -125,8 +133,8 @@ for epoch in range(wandb.config.epochs):
 
         # 2. Compute loss and accuracy
         loss = criterion(y_pred, labels)
-        correct_preds += (labels == torch.round(y_pred)).sum()
-        wrong_preds += (labels != torch.round(y_pred)).sum()
+        train_correct_preds += (labels == torch.round(y_pred)).sum()
+        train_wrong_preds += (labels != torch.round(y_pred)).sum()
 
         # 3. zero gradients before running the backward pass
         optimizer.zero_grad()
@@ -138,27 +146,25 @@ for epoch in range(wandb.config.epochs):
         # 5. Update parameters
         optimizer.step()
 
-        running_loss += loss.item()
+        train_loss += loss.item()
 
-
-    acc = correct_preds / (correct_preds + wrong_preds)
-    print(f"Train - Epoch: {epoch}, Loss: {running_loss: .2f}, Accuracy: {acc: .4f}")
+    train_acc = train_correct_preds / (train_correct_preds + train_wrong_preds)
+    print(f"Train - Epoch: {epoch}, Loss: {train_loss: .2f}, Accuracy: {train_acc: .4f}")
 
     # Validation
-    running_loss = 0.0
+    val_loss = 0.0
     correct_preds = 0.0
-    
+
     wrong_preds = 0.0
     true_negative = 0.0
     false_positive = 0.0
     false_negatives = 0.0
     true_positive = 0.0
 
-
     with torch.no_grad():
         for i, (images, labels) in enumerate(val_loader):
             images = images.to(device)
-            labels = labels.to(device).float()       
+            labels = labels.to(device).float()
 
             model.eval()
             y_pred = model(images)
@@ -167,7 +173,7 @@ for epoch in range(wandb.config.epochs):
             try:
                 tn, fp, fn, tp = confusion_matrix(
                     labels.cpu().numpy(), torch.round(y_pred).cpu().numpy()
-                    ).ravel()
+                ).ravel()
                 true_negative += tn
                 false_positive += fp
                 false_negatives += fn
@@ -175,26 +181,29 @@ for epoch in range(wandb.config.epochs):
             except:
                 pass
 
-            running_loss += loss.item()
+            val_loss += loss.item()
             correct_preds += (labels == torch.round(y_pred)).sum()
             wrong_preds += (labels != torch.round(y_pred)).sum()
 
-        acc = correct_preds / (correct_preds + wrong_preds)
+        val_acc = correct_preds / (correct_preds + wrong_preds)
         precision = true_positive / (true_positive + false_positive)
         recall = true_positive / (true_positive + false_negatives)
         f1 = 2 * precision * recall / (precision + recall)
-        wandb.log({
-            "epoch": epoch,
-            "train_loss": running_loss,
-            "train_acc": acc,
-            "val_loss": running_loss,
-            "val_acc": acc,
-            "val_precision": precision,
-            "val_recall": recall,
-            "val_f1": f1
-        })
-        print(f"Eval  - Epoch: {epoch}, Loss: {running_loss: .2f}, Accuracy: {acc: .4f}")
-
+        wandb.log(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "val_loss": val_loss,
+                "val_acc": val_acc,
+                "val_precision": precision,
+                "val_recall": recall,
+                "val_f1": f1,
+            }
+        )
+        print(
+            f"Eval  - Epoch: {epoch}, Loss: {val_loss: .2f}, Accuracy: {val_acc: .4f}"
+        )
 
     # Save model checpoint
     if (epoch) % 10 == 0:
