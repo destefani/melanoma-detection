@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import wandb
 
-wandb.init(project="melanoma-detection", entity="mdestefani")
+  
 
 
 root_dir = "dataset/siim-isic-melanoma-classification/jpeg/train/"
@@ -21,7 +21,7 @@ os.mkdir(f"results/{wandb.run.name}")
 wandb.config.update(
     {
         "epochs": 51,
-        "batch_size": 32,
+        "batch_size": 16,
         "n_workers": 12,
         "learning_rate": 1e-3,
         "lambda_l2": 1e-5,
@@ -102,8 +102,8 @@ val_loader = DataLoader(
 device = "cuda" if torch.cuda.is_available else "cpu"
 
 
-model = torch.hub.load("pytorch/vision:v0.10.0", "resnet34", pretrained=True)
-model.fc = nn.Linear(512, 1)
+model = torch.hub.load("pytorch/vision:v0.10.0", "resnet50", pretrained=True)
+model.fc = nn.Linear(2048, 1)
 model.to(device)
 
 
