@@ -1,10 +1,11 @@
 import torch
+import numpy as np
 import PIL.Image
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
 
-class ISIC2020(torch.utils.Dataset):
+class ISIC2020(torch.utils.data.Dataset):
     "ISIC-2020 Dataset"
 
     def __init__(self,
@@ -48,7 +49,7 @@ class ISIC2020(torch.utils.Dataset):
         filename = self.annotations.iloc[idx]
         file_directory = self.root_dir + filename + self.format
         image = PIL.Image.open(file_directory)
-        label = self.labels.iloc[idx]
+        label = self.labels.iloc[idx].astype(np.float32)
 
         if self.transform:
             image = self.transform(image)
