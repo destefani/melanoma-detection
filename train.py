@@ -3,33 +3,36 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from torchvision import transforms
-from dataset import MelanomaDataset
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score
 import pandas as pd
 import numpy as np
 import wandb
 
-  
+from training.networks import ResNet
+from training.dataset import ISIC2020
 
 
-root_dir = "dataset/siim-isic-melanoma-classification/jpeg/train/"
-annotations_csv = "dataset/siim-isic-melanoma-classification/train.csv"
+root_dir = "data/train/"
+annotations_csv = "data/ISIC_2020_Training_GroundTruth_v2.csv"
 
-os.mkdir(f"results/{wandb.run.name}")
+# wand config
+wandb.init(project="melanoma-detection", entity="mdestefani")
+results_dir = os.path.join("results", wandb.run.name)
 
+os.makedirs(results_dir)
 
 wandb.config.update(
     {
         "epochs": 51,
         "batch_size": 16,
-        "n_workers": 12,
+        "n_workers": 0,
         "learning_rate": 1e-3,
         "lambda_l2": 1e-5,
+        "model": "resnet18"
     }
 )
 
 # Transforms
-
 train_transforms = transforms.Compose(
     [
         transforms.Resize(256),
@@ -54,8 +57,7 @@ val_transforms = transforms.Compose(
 )
 
 # Create datasets
-
-train_dataset = MelanomaDataset(
+train_dataset = ISIC2020(
     annotations_csv,
     root_dir=root_dir,
     transform=train_transforms,
@@ -64,7 +66,7 @@ train_dataset = MelanomaDataset(
     seed=42,
 )
 
-test_dataset = MelanomaDataset(
+test_dataset = ISIC2020(
     annotations_csv,
     root_dir=root_dir,
     transform=train_transforms,
@@ -101,11 +103,9 @@ val_loader = DataLoader(
 
 device = "cuda" if torch.cuda.is_available else "cpu"
 
-
-model = torch.hub.load("pytorch/vision:v0.10.0", "resnet50", pretrained=True)
-model.fc = nn.Linear(2048, 1)
-model.to(device)
-
+model = ResNet(wandb.config.model, pretrained=True, num_classes=1)
+if torch.cuda.is_available():
+    model.to(device)
 
 criterion = nn.BCELoss()
 
@@ -123,8 +123,9 @@ for epoch in range(wandb.config.epochs):
     train_wrong_preds = 0.0
 
     for i, (images, labels) in enumerate(train_loader):
-        images = images.to(device)
-        labels = labels.to(device).float()
+        if torch.cuda.is_available():
+            images = images.to(device)
+            labels = labels.to(device).float()
 
         model.train()
         # 1. Feed forward to get logits
@@ -163,8 +164,9 @@ for epoch in range(wandb.config.epochs):
 
     with torch.no_grad():
         for i, (images, labels) in enumerate(val_loader):
-            images = images.to(device)
-            labels = labels.to(device).float()
+            if torch.cuda.is_available():
+                images = images.to(device)
+                labels = labels.to(device).float()
 
             model.eval()
             y_pred = model(images)
@@ -178,6 +180,8 @@ for epoch in range(wandb.config.epochs):
                 false_positive += fp
                 false_negatives += fn
                 true_positive += tp
+        
+                auc_score = roc_auc_score(labels.cpu().numpy(), y_pred.cpu().numpy())    
             except:
                 pass
 
@@ -199,6 +203,7 @@ for epoch in range(wandb.config.epochs):
                 "val_precision": precision,
                 "val_recall": recall,
                 "val_f1": f1,
+                "val_auc": auc_score
             }
         )
         print(
