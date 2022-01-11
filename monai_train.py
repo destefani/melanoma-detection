@@ -32,7 +32,7 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 
-from training.networks import ResNet
+from training.networks import ResNet, EfficientNet7
 from training.dataset import ISIC2020, CacheISIC2020, PersistISIC2020
 
 print_config()
@@ -50,11 +50,13 @@ os.makedirs(results_dir)
 wandb.config.update(
     {
         "epochs": 70,
-        "batch_size": 512,
+        "batch_size": 256,
         "n_workers": 8,
-        "learning_rate": 1e-3,
+        "learning_rate": 0.002,
         "lambda_l2": 1e-5,
-        "model": "resnet18"
+        "model": "efficientnetb7",
+        "pretrained": True,
+        "warmup": False,
     }
 )
 
@@ -90,7 +92,7 @@ train_dataset = CacheISIC2020(
     test=False,
     test_size=0.1,
     seed=42,
-    warmup=False
+    warmup=wandb.config.warmup
 )
 
 val_dataset = CacheISIC2020(
@@ -100,7 +102,7 @@ val_dataset = CacheISIC2020(
     test=True,
     test_size=0.2,
     seed=42,
-    warmup=False
+    warmup=wandb.config.warmup
 )
 
 
@@ -133,7 +135,9 @@ val_loader = DataLoader(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-model = ResNet(wandb.config.model, pretrained=True, num_classes=1)
+model = EfficientNet7(pretrained=wandb.config.pretrained, num_classes=1)
+wandb.watch(model)
+
 if torch.cuda.is_available():
     model.to(device)
     print(model)
@@ -152,7 +156,6 @@ auc_metric = ROCAUCMetric()
 
 
 for epoch in range(wandb.config.epochs):
-    wandb.watch(model)
     # Training
     model.train()
     train_loss = 0.0
@@ -171,7 +174,7 @@ for epoch in range(wandb.config.epochs):
         loss.backward()
         # 5. Update parameters
         optimizer.step()
-        train_loss += loss.item()
+        train_loss += loss.item()  # check loss
 
     print(f"Train - Epoch: {epoch}, Loss: {train_loss:.4f}")
 
