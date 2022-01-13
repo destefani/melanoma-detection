@@ -49,12 +49,12 @@ os.makedirs(results_dir)
 
 wandb.config.update(
     {
-        "epochs": 70,
+        "epochs": 100,
         "batch_size": 256,
         "n_workers": 8,
-        "learning_rate": 0.002,
+        "learning_rate": 0.001,
         "lambda_l2": 1e-5,
-        "model": "efficientnetb7",
+        "model": "resnet152",
         "pretrained": True,
         "warmup": False,
     }
@@ -135,7 +135,7 @@ val_loader = DataLoader(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-model = EfficientNet7(pretrained=wandb.config.pretrained, num_classes=1)
+model = ResNet(wandb.config.model, pretrained=wandb.config.pretrained)
 wandb.watch(model)
 
 if torch.cuda.is_available():
