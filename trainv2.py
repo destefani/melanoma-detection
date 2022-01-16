@@ -1,9 +1,7 @@
 import os
 import torch
-from torch import nn, sigmoid
-from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
-from torchvision import transforms
-from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve, auc
+from torch import nn
+from torch.utils.data import DataLoader, WeightedRandomSampler
 import pandas as pd
 import numpy as np
 import wandb
@@ -18,20 +16,13 @@ from monai.handlers import (
     ValidationHandler,
     ROCAUC
 )
-from monai.metrics import ROCAUCMetric
 from monai.networks.nets import DenseNet121
-from monai.inferers import SimpleInferer
 
 from monai.transforms import (
-    Activations,
-    AddChannel,
     AsChannelFirstd,
-    AsDiscrete,
     Compose,
     CenterSpatialCropd,
     LoadImaged,
-    RandFlip,
-    RandRotate,
     RandAxisFlipd,
     RandZoom,
     ScaleIntensity,
@@ -42,12 +33,9 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 from ignite.contrib.handlers.wandb_logger import *
-
 from ignite.engine import Events, create_supervised_evaluator, create_supervised_trainer
 
-
-from training.networks import ResNet, EfficientNet7
-from training.dataset import ISIC2020, CacheISIC2020, PersistISIC2020
+from training.dataset import CacheISIC2020
 
 print_config()
 
@@ -72,7 +60,7 @@ def main():
             "model": "densenet121",
             "pretrained": True,
             "warmup": False,
-            "cache_rate": 0.5
+            "cache_rate": 1.0
         }
     )
 
@@ -172,11 +160,7 @@ def main():
     )
     print(optimizer)
 
-    auc_metric = ROCAUCMetric(
-        average="weighted",
-    )
 
-    train_epochs = wandb.config.epochs
     iter_losses = []
     batch_sizes = []
     epoch_loss_values = []
@@ -200,7 +184,6 @@ def main():
     val_handlers = [
         CheckpointSaver(save_dir=results_dir, save_dict={"model": model}, save_key_metric=True),
     ]
-
 
     evaluator = SupervisedEvaluator(
         device=device,
