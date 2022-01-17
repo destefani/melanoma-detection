@@ -57,7 +57,7 @@ def main():
     wandb.config.update(
         {
             "epochs": 50,
-            "batch_size": 128,
+            "batch_size": 64,
             "n_workers": 8,
             "learning_rate": 1e-3,
             "lambda_l2": 1e-5,
@@ -148,7 +148,7 @@ def main():
     print('Device:', device)
 
 
-    model = DenseNet121(
+    model = DenseNet201(
         spatial_dims=2,
         in_channels=3,
         out_channels=1,
