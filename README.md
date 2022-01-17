@@ -8,6 +8,11 @@ This repository has the objective of assessing the possibility of using Deep Lea
 - API: An API that serves the model compliently.
 - App: A web app that allows users to upload a picture and receive a prediction.
  
+## Web Application
+- Application: https://share.streamlit.io/destefani/melanoma-app/main/app.py
+- Repository: https://github.com/destefani/melanoma-app
+
 ## Reproducibility
  
 ## Deployment
+
