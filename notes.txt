@@ -1,0 +1,10 @@
+# Dataset
+
+    Imbalanced Datasets:
+    
+    https://www.youtube.com/watch?v=4JFVhJyTZ44
+
+    Methods to deal with imbalanced datasets:
+        1. Oversampling
+        2. Class weighting
+

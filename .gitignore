@@ -132,3 +132,7 @@ dmypy.json
 dataset/
 data/
 wandb/
+results/
+research/
+resources/
+cache_dir/
