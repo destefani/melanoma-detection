@@ -11,7 +11,7 @@ from monai.config import print_config
 from monai.data import CacheDataset
 from monai.engines import SupervisedEvaluator, SupervisedTrainer
 from monai.handlers import CheckpointSaver, StatsHandler, ValidationHandler, ROCAUC
-from monai.networks.nets import DenseNet121, DenseNet201
+from monai.networks.nets import DenseNet121, DenseNet169, DenseNet201
 
 from monai.transforms import (
     AsChannelFirstd,
@@ -60,8 +60,8 @@ def main():
             "lambda_l2": 0,
             "model": "densenet121",
             "pretrained": True,
-            "warmup": True,
-            "cache_rate": 0.05,
+            "warmup": False,
+            "cache_rate": 1.0,
         }
     )
 
@@ -222,6 +222,7 @@ def main():
         epoch_loss_values.append(overall_average_loss)
 
         # clear the contents of iter_losses and batch_sizes for the next epoch
+        engine.state.iteration = 0
         del iter_losses[:]
         del batch_sizes[:]
 
