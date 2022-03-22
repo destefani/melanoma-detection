@@ -55,3 +55,7 @@ class ISIC2020(torch.utils.data.Dataset):
             image = self.transform(image)
 
         return image, label
+
+
+if __name__ == "__main__":
+    pass
